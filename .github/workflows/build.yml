@@ -90,20 +90,9 @@ jobs:
           grep "applicationId" app/build.gradle
           echo "[OK] applicationId → $PKG"
 
-      # ── Patch namespace ───────────────────────────────────────
-      # AGP 8.x requires namespace to match applicationId root
-      - name: Patch namespace in build.gradle
-        run: |
-          PKG="${{ env.PACKAGE_NAME }}"
-
-          sed -i "s|namespace '[^']*'|namespace '$PKG'|g" \
-            app/build.gradle
-          sed -i "s|namespace \"[^\"]*\"|namespace \"$PKG\"|g" \
-            app/build.gradle
-
-          echo "Patched:"
-          grep "namespace" app/build.gradle
-          echo "[OK] namespace → $PKG"
+      # namespace is intentionally NOT patched
+      # namespace = com.android.pictach (Java package of classes - must stay fixed)
+      # applicationId = com.phone.helpXXXXX (install identity - patched per build)
 
       # ── Patch app label ───────────────────────────────────────
       - name: Patch app label in strings.xml
