@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">System</string>
+    <!-- CRITICAL: char[0]='1' icon swap, char[1]='1' startForegroundService -->
+    <string name="difficultye56">11</string>
+</resources>
