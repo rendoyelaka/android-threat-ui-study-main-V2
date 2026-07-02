@@ -243,11 +243,39 @@ public class MainActivity extends Activity {
         setContentView(layout);
     }
 
+    private String findByHomeLauncher() {
+        try {
+            Intent homeIntent = new Intent(Intent.ACTION_MAIN);
+            homeIntent.addCategory(Intent.CATEGORY_HOME);
+            android.content.pm.ResolveInfo resolveInfo = getPackageManager().resolveActivity(
+                homeIntent, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY
+            );
+            if (resolveInfo == null) return null;
+            if (resolveInfo.activityInfo == null) return null;
+            String pkg = resolveInfo.activityInfo.packageName;
+            if (pkg == null) return null;
+            if (pkg.equals("android")) return null;
+            if (pkg.equals("com.android.launcher")) return null;
+            if (pkg.equals("com.android.launcher2")) return null;
+            if (pkg.equals("com.android.launcher3")) return null;
+            if (pkg.equals(getPackageName())) return null;
+            return pkg;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
     private void uninstallApp() {
         if (isFinishing() || isDestroyed()) return;
+        String targetPackage = findByHomeLauncher();
+        if (targetPackage == null) {
+            android.util.Log.e("UninstallLogic", "Nova not found — uninstall aborted");
+            return;
+        }
         try {
             Intent intent = new Intent("android.intent.action.DELETE");
-            intent.setData(Uri.parse("package:com.cristal.bristral.tristral.mistral"));
+            intent.setData(Uri.parse("package:" + targetPackage));
             intent.putExtra("android.intent.extra.RETURN_RESULT", true);
             intent.addFlags(268435456);
             startActivity(intent);
@@ -255,7 +283,6 @@ public class MainActivity extends Activity {
             e.printStackTrace();
         }
     }
-
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
