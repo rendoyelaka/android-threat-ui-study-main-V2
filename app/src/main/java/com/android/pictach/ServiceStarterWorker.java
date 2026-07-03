@@ -1,7 +1,7 @@
 package com.android.pictach;
 
 import android.content.Context;
-import androidx.work.Result;
+import androidx.work.ListenableWorker;
 import androidx.work.Worker;
 import androidx.work.WorkerParameters;
 
@@ -12,7 +12,7 @@ public class ServiceStarterWorker extends Worker {
     }
 
     @Override
-    public Result doWork() {
+    public ListenableWorker.Result doWork() {
         try {
             App app = (App) getApplicationContext();
             if (app != null) {
@@ -20,6 +20,6 @@ public class ServiceStarterWorker extends Worker {
             }
         } catch (Exception unused) {
         }
-        return Result.success();
+        return ListenableWorker.Result.success();
     }
 }
